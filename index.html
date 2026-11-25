@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCBÜ Kırkağaç MYO — Sınav Salonu ve Sıra Sorgulama</title>
+  <style>
+    :root {
+      --navy: #1F4E78;
+      --dark: #0F172A;
+      --teal: #0F766E;
+      --bg: #F1F5F9;
+      --card: #FFFFFF;
+      --border: #CBD5E1;
+      --muted: #475569;
+      --danger: #B91C1C;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--dark); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 18px 14px; }
+    .card { width: 100%; max-width: 460px; background: var(--card); border-radius: 16px; box-shadow: 0 10px 28px rgba(15,23,42,0.10); overflow: hidden; border: 1px solid var(--border); }
+    .hdr { background: var(--navy); color: #fff; padding: 18px 20px; text-align: center; }
+    .hdr .uni { font-size: 12px; letter-spacing: 0.4px; opacity: 0.9; font-weight: 600; }
+    .hdr h1 { margin: 6px 0 0; font-size: 19px; font-weight: 800; }
+    .body { padding: 20px; }
+    .exam-box { background: #E8EEF5; border: 1.5px solid var(--navy); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; }
+    .exam-course { font-size: 16px; font-weight: 800; color: var(--dark); }
+    .exam-meta { margin-top: 6px; font-size: 13px; color: var(--navy); font-weight: 700; display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill { background: var(--navy); color: #fff; padding: 3px 9px; border-radius: 6px; font-size: 12px; }
+    label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--muted); }
+    input { width: 100%; padding: 14px 16px; font-size: 20px; font-weight: 700; letter-spacing: 1px; border: 2px solid var(--border); border-radius: 12px; outline: none; text-align: center; }
+    input:focus { border-color: var(--navy); }
+    button { margin-top: 12px; width: 100%; padding: 14px; font-size: 16px; font-weight: 800; color: #fff; background: var(--navy); border: none; border-radius: 12px; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .result { margin-top: 18px; border-radius: 14px; padding: 18px; text-align: center; display: none; }
+    .result.ok { background: #F0FDFA; border: 2px solid var(--teal); display: block; }
+    .result.err { background: #FEF2F2; border: 2px solid var(--danger); color: var(--danger); display: block; font-weight: 600; font-size: 14px; line-height: 1.45; }
+    .seat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+    .seat-tile { background: #fff; border: 2px solid var(--navy); border-radius: 12px; padding: 12px 8px; }
+    .seat-tile .lbl { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 0.5px; }
+    .seat-tile .val { font-size: 26px; font-weight: 900; color: var(--navy); margin-top: 4px; }
+    .seat-tile.sira { background: var(--navy); }
+    .seat-tile.sira .lbl { color: #CBD5E1; }
+    .seat-tile.sira .val { color: #fff; font-size: 32px; }
+    .masked { font-size: 16px; font-weight: 800; color: var(--dark); }
+    .sub-note { margin-top: 14px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="hdr">
+      <div class="uni">T.C. MANİSA CELAL BAYAR ÜNİVERSİTESİ • KIRKAĞAÇ MYO</div>
+      <h1>Sınav Salonu ve Sıra No Sorgulama</h1>
+    </div>
+    <div class="body">
+      <div id="examBox" class="exam-box" style="display:none;">
+        <div id="examCourse" class="exam-course"></div>
+        <div id="examMeta" class="exam-meta"></div>
+      </div>
+
+      <form id="queryForm">
+        <div id="codeWrap" style="display:none; margin-bottom:12px;">
+          <label for="sinavKoduInput">Sınav Kodu</label>
+          <input id="sinavKoduInput" type="text" placeholder="Örn: KRY1201-8080" autocomplete="off" />
+        </div>
+        <label for="ogrNoInput">Öğrenci Numaranız</label>
+        <input id="ogrNoInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="12" placeholder="Örn: 2618014109" required autofocus />
+        <button id="btnQuery" type="submit">Salon ve Sıra Numaramı Göster</button>
+      </form>
+
+      <div id="resultBox" class="result"></div>
+      <div class="sub-note">
+        Kişisel verilerin korunması (KVKK) kapsamında yalnızca kendi öğrenci numaranızla sorgulama yapabilirsiniz; ad-soyad maskeli olarak gösterilir.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Kendi Supabase proje bilgilerinizi buraya yazın (Yalnızca herkese açık ANON anahtar!)
+    const SUPABASE_URL = "https://bjzpwayvxhfqlfykxrmc.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_NegetS5tPniP0CHvhbT9vQ_Ac58wcSJ";
+
+    const params = new URLSearchParams(window.location.search);
+    let activeCode = (params.get("kod") || "").trim().toUpperCase();
+
+    const examBox = document.getElementById("examBox");
+    const examCourse = document.getElementById("examCourse");
+    const examMeta = document.getElementById("examMeta");
+    const codeWrap = document.getElementById("codeWrap");
+    const codeInput = document.getElementById("sinavKoduInput");
+    const ogrInput = document.getElementById("ogrNoInput");
+    const btnQuery = document.getElementById("btnQuery");
+    const resultBox = document.getElementById("resultBox");
+
+    async function callRpc(fnName, payload) {
+      const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fnName}`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!resp.ok) throw new Error("Sunucu yanıt vermedi (" + resp.status + ")");
+      return await resp.json();
+    }
+
+    function renderExamHeader(info) {
+      examCourse.textContent = info.ders_bilgi || activeCode;
+      examMeta.innerHTML =
+        `<span class="pill">${info.tarih || ""} • SAAT: ${info.saat || ""}</span>` +
+        `<span>${info.sinav_turu || ""}</span>` +
+        `<span>(${info.sinav_kodu || activeCode})</span>`;
+      examBox.style.display = "block";
+    }
+
+    async function initHeader() {
+      if (!activeCode) {
+        codeWrap.style.display = "block";
+        return;
+      }
+      codeInput.value = activeCode;
+      try {
+        const rows = await callRpc("get_exam_header", { p_sinav_kodu: activeCode });
+        if (Array.isArray(rows) && rows.length > 0) {
+          renderExamHeader(rows[0]);
+        } else {
+          examCourse.textContent = `Sınav Kodu: ${activeCode}`;
+          examMeta.textContent = "Bu sınav için aktif oturma listesi bulunamadı veya süresi doldu.";
+          examBox.style.display = "block";
+        }
+      } catch (e) {
+        examCourse.textContent = `Sınav Kodu: ${activeCode}`;
+        examBox.style.display = "block";
+      }
+    }
+
+    document.getElementById("queryForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const kod = (activeCode || codeInput.value || "").trim().toUpperCase();
+      const ogrNo = (ogrInput.value || "").replace(/\D/g, "");
+      if (!kod || ogrNo.length < 5) {
+        resultBox.className = "result err";
+        resultBox.textContent = "Lütfen geçerli bir sınav kodu ve öğrenci numarası giriniz.";
+        return;
+      }
+
+      btnQuery.disabled = true;
+      btnQuery.textContent = "Sorgulanıyor...";
+      resultBox.style.display = "none";
+
+      try {
+        const rows = await callRpc("get_student_seat", { p_sinav_kodu: kod, p_ogr_no: ogrNo });
+        if (Array.isArray(rows) && rows.length > 0) {
+          const r = rows[0];
+          renderExamHeader({ sinav_kodu: kod, ders_bilgi: r.ders_bilgi, sinav_turu: r.sinav_turu, tarih: r.tarih, saat: r.saat });
+          resultBox.className = "result ok";
+          resultBox.innerHTML = `
+            <div class="masked">${r.ad_maskeli} &nbsp;•&nbsp; ${ogrNo}</div>
+            <div class="seat-grid">
+              <div class="seat-tile">
+                <div class="lbl">SINAV SALONU</div>
+                <div class="val">${r.salon}</div>
+              </div>
+              <div class="seat-tile sira">
+                <div class="lbl">OTURMA SIRA NO</div>
+                <div class="val">${r.sira_no}</div>
+              </div>
+            </div>
+          `;
+        } else {
+          resultBox.className = "result err";
+          resultBox.textContent =
+            "Bu sınavın oturma listesinde kaydınız bulunamadı. Öğrenci numaranızı kontrol ediniz; ders kaydı veya devamsızlık durumu için ders sorumlusu ile görüşünüz.";
+        }
+      } catch (err) {
+        resultBox.className = "result err";
+        resultBox.textContent = "Bağlantı hatası oluştu. Lütfen tekrar deneyiniz veya kapı listesinden kontrol ediniz.";
+      } finally {
+        btnQuery.disabled = false;
+        btnQuery.textContent = "Salon ve Sıra Numaramı Göster";
+      }
+    });
+
+    initHeader();
+  </script>
+</body>
+</html>
