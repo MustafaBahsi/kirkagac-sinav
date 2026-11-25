@@ -24,7 +24,7 @@
     .body { padding: 20px; }
     .exam-box { background: #E8EEF5; border: 1.5px solid var(--navy); border-radius: 12px; padding: 12px 14px; margin-bottom: 18px; }
     .exam-course { font-size: 16px; font-weight: 800; color: var(--dark); }
-    .exam-meta { margin-top: 6px; font-size: 13px; color: var(--navy); font-weight: 700; display: flex; flex-wrap: wrap; gap: 8px; }
+    .exam-meta { margin-top: 6px; font-size: 13px; color: var(--navy); font-weight: 700; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .pill { background: var(--navy); color: #fff; padding: 3px 9px; border-radius: 6px; font-size: 12px; }
     label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; color: var(--muted); }
     input { width: 100%; padding: 14px 16px; font-size: 20px; font-weight: 700; letter-spacing: 1px; border: 2px solid var(--border); border-radius: 12px; outline: none; text-align: center; }
@@ -37,7 +37,7 @@
     .seat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
     .seat-tile { background: #fff; border: 2px solid var(--navy); border-radius: 12px; padding: 12px 8px; }
     .seat-tile .lbl { font-size: 11px; font-weight: 800; color: var(--muted); letter-spacing: 0.5px; }
-    .seat-tile .val { font-size: 26px; font-weight: 900; color: var(--navy); margin-top: 4px; }
+    .seat-tile .val { font-size: 24px; font-weight: 900; color: var(--navy); margin-top: 4px; }
     .seat-tile.sira { background: var(--navy); }
     .seat-tile.sira .lbl { color: #CBD5E1; }
     .seat-tile.sira .val { color: #fff; font-size: 32px; }
@@ -57,13 +57,13 @@
         <div id="examMeta" class="exam-meta"></div>
       </div>
 
-      <form id="queryForm">
+      <form id="queryForm" novalidate>
         <div id="codeWrap" style="display:none; margin-bottom:12px;">
           <label for="sinavKoduInput">Sınav Kodu</label>
           <input id="sinavKoduInput" type="text" placeholder="Örn: KRY1201-8080" autocomplete="off" />
         </div>
         <label for="ogrNoInput">Öğrenci Numaranız</label>
-        <input id="ogrNoInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="12" placeholder="Örn: 2618014109" required autofocus />
+        <input id="ogrNoInput" type="tel" inputmode="numeric" maxlength="14" placeholder="Örn: 2618014109" autofocus />
         <button id="btnQuery" type="submit">Salon ve Sıra Numaramı Göster</button>
       </form>
 
@@ -75,9 +75,8 @@
   </div>
 
   <script>
-    // Kendi Supabase proje bilgilerinizi buraya yazın (Yalnızca herkese açık ANON anahtar!)
     const SUPABASE_URL = "https://bjzpwayvxhfqlfykxrmc.supabase.co";
-    const SUPABASE_ANON_KEY = "sb_publishable_NegetS5tPniP0CHvhbT9vQ_Ac58wcSJ";
+    const SUPABASE_ANON_KEY = "BURAYA_SB_PUBLISHABLE_KEY_YAZIN";
 
     const params = new URLSearchParams(window.location.search);
     let activeCode = (params.get("kod") || "").trim().toUpperCase();
@@ -137,6 +136,7 @@
         }
       } catch (e) {
         examCourse.textContent = `Sınav Kodu: ${activeCode}`;
+        examMeta.textContent = "Bağlantı uyarısı: " + e.message;
         examBox.style.display = "block";
       }
     }
@@ -153,13 +153,19 @@
 
       btnQuery.disabled = true;
       btnQuery.textContent = "Sorgulanıyor...";
-      resultBox.style.display = "none";
+      resultBox.className = "result";
 
       try {
         const rows = await callRpc("get_student_seat", { p_sinav_kodu: kod, p_ogr_no: ogrNo });
         if (Array.isArray(rows) && rows.length > 0) {
           const r = rows[0];
-          renderExamHeader({ sinav_kodu: kod, ders_bilgi: r.ders_bilgi, sinav_turu: r.sinav_turu, tarih: r.tarih, saat: r.saat });
+          renderExamHeader({
+            sinav_kodu: kod,
+            ders_bilgi: r.ders_bilgi,
+            sinav_turu: r.sinav_turu,
+            tarih: r.tarih,
+            saat: r.saat
+          });
           resultBox.className = "result ok";
           resultBox.innerHTML = `
             <div class="masked">${r.ad_maskeli} &nbsp;•&nbsp; ${ogrNo}</div>
@@ -181,7 +187,7 @@
         }
       } catch (err) {
         resultBox.className = "result err";
-        resultBox.textContent = "Bağlantı hatası oluştu. Lütfen tekrar deneyiniz veya kapı listesinden kontrol ediniz.";
+        resultBox.textContent = "Bağlantı hatası: " + err.message;
       } finally {
         btnQuery.disabled = false;
         btnQuery.textContent = "Salon ve Sıra Numaramı Göster";
